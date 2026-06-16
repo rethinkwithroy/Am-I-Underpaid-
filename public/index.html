@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Am I Underpaid? — Free Salary Report Card</title>
+<meta name="description" content="Find out if you're being paid what you're worth. Real BLS data + AI. Get a salary report in 10 seconds." />
+<meta property="og:title" content="Am I Underpaid?" />
+<meta property="og:description" content="Find out if you're being paid what you're worth — free salary report in 10 seconds." />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<style>
+  :root {
+    --bg: #0A0A0A;
+    --card: #111111;
+    --border: #1E1E1E;
+    --border-focus: #444444;
+    --text: #F0F0F0;
+    --text-secondary: #888888;
+    --text-muted: #4A4A4A;
+    --underpaid: #FF4444;
+    --fairly-paid: #22C55E;
+    --overpaid: #A78BFA;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 48px;
+    -webkit-font-smoothing: antialiased;
+  }
+  header { text-align: center; margin-bottom: 28px; }
+  header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+  header p { color: var(--text-secondary); font-size: 15px; margin-top: 6px; }
+
+  .card {
+    width: 100%;
+    max-width: 520px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+
+  label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 500; }
+  .field { margin-bottom: 16px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  input, select {
+    width: 100%;
+    background: #0D0D0D;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 15px;
+    padding: 12px 14px;
+    transition: border-color 0.15s ease;
+    font-family: inherit;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--border-focus); }
+  input::placeholder { color: var(--text-muted); }
+  select { appearance: none; cursor: pointer; }
+
+  .salary-wrap { position: relative; }
+  .salary-wrap span.prefix {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--text-secondary); font-size: 15px; pointer-events: none;
+  }
+  .salary-wrap input { padding-left: 28px; }
+
+  .dropzone {
+    border: 1px dashed var(--border-focus);
+    border-radius: 10px;
+    padding: 18px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .dropzone:hover { border-color: #666; background: #0D0D0D; }
+  .dropzone.has-file { color: var(--fairly-paid); border-color: var(--fairly-paid); }
+  .dropzone input[type=file] { display: none; }
+
+  button.primary {
+    width: 100%;
+    background: var(--text);
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 14px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: opacity 0.15s ease;
+    font-family: inherit;
+  }
+  button.primary:hover { opacity: 0.88; }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .error-msg { color: var(--underpaid); font-size: 13px; margin-top: 12px; min-height: 16px; }
+
+  /* Loading */
+  #loading-section { text-align: center; padding: 40px 0; }
+  .loading-dots { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+  .loading-dots span {
+    width: 8px; height: 8px; background: #888; border-radius: 50%;
+    display: inline-block; animation: pulse 1.4s ease-in-out infinite;
+  }
+  .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+  #loading-section p { color: var(--text-secondary); font-size: 14px; }
+
+  /* Result */
+  #result-section { animation: fadeUp 0.35s ease; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .result-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  .result-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; color: var(--text-secondary); }
+  .seniority-badge {
+    font-size: 12px; font-weight: 600; padding: 5px 10px;
+    border: 1px solid var(--border); border-radius: 999px; color: var(--text-secondary);
+  }
+  .verdict { text-transform: uppercase; letter-spacing: 0.04em; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  .verdict.underpaid { color: var(--underpaid); }
+  .verdict.fairly_paid { color: var(--fairly-paid); }
+  .verdict.overpaid { color: var(--overpaid); }
+  .gap-amount { font-size: 60px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+  .gap-amount.underpaid { color: var(--underpaid); }
+  .gap-amount.fairly_paid { color: var(--fairly-paid); }
+  .gap-amount.overpaid { color: var(--overpaid); }
+  .gap-label { color: var(--text-secondary); font-size: 14px; margin-top: 8px; }
+
+  .stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 24px 0 18px; }
+  .stat-box { background: #0D0D0D; border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .stat-box .k { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .stat-box .v { font-size: 18px; font-weight: 700; }
+  .stat-box .sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  .sources { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+  .skills-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .skill-pill {
+    font-size: 12px; padding: 5px 11px; background: #0D0D0D;
+    border: 1px solid var(--border); border-radius: 999px; color: var(--text);
+  }
+  .summary { color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+
+  .divider { height: 1px; background: var(--border); margin: 22px 0; }
+  .share-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
+  .share-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .share-btn {
+    background: #0D0D0D; border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 11px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: border-color 0.15s ease; font-family: inherit;
+  }
+  .share-btn:hover { border-color: var(--border-focus); }
+  .check-another {
+    display: block; text-align: center; margin-top: 18px;
+    color: var(--text-secondary); font-size: 14px; background: none; border: none;
+    cursor: pointer; width: 100%; font-family: inherit;
+  }
+  .check-another:hover { color: var(--text); }
+
+  footer { margin-top: 28px; color: var(--text-muted); font-size: 12px; text-align: center; }
+  footer a { color: var(--text-secondary); text-decoration: none; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--card); border: 1px solid var(--border-focus); color: var(--text);
+    padding: 12px 18px; border-radius: 10px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s ease; z-index: 50;
+  }
+  .toast.show { opacity: 1; }
+
+  .hidden { display: none !important; }
+
+  @media (max-width: 480px) {
+    .row, .stat-row { grid-template-columns: 1fr; }
+    .share-row { grid-template-columns: 1fr; }
+    .gap-amount { font-size: 48px; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Am I Underpaid?</h1>
+    <p>Real salary benchmarks + AI. Find out in 10 seconds.</p>
+  </header>
+
+  <!-- FORM -->
+  <section class="card" id="form-section">
+    <div class="field">
+      <label for="title">Job title *</label>
+      <input id="title" type="text" placeholder="e.g. Product Designer" autocomplete="off" />
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="salary">Current annual salary *</label>
+        <div class="salary-wrap">
+          <span class="prefix">$</span>
+          <input id="salary" type="number" min="0" placeholder="70000" inputmode="numeric" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="experience">Years of experience *</label>
+        <input id="experience" type="number" min="0" max="80" placeholder="5" inputmode="numeric" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="city">City / Location *</label>
+        <input id="city" type="text" placeholder="San Francisco" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="industry">Industry</label>
+        <input id="industry" type="text" placeholder="Tech / SaaS" autocomplete="off" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="company-size">Company size</label>
+      <select id="company-size">
+        <option value="Startup">Startup (1–10)</option>
+        <option value="Small">Small (11–50)</option>
+        <option value="Medium" selected>Medium (51–500)</option>
+        <option value="Large">Large (501–5000)</option>
+        <option value="Enterprise">Enterprise (5000+)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Resume PDF (optional — improves accuracy)</label>
+      <label class="dropzone" id="dropzone">
+        <span id="dropzone-text">Click to upload your resume PDF</span>
+        <input id="resume-file" type="file" accept="application/pdf" />
+      </label>
+    </div>
+
+    <button class="primary" id="analyze-btn" onclick="analyze()">Analyze my salary</button>
+    <div class="error-msg" id="error-msg"></div>
+  </section>
+
+  <!-- LOADING -->
+  <section class="card hidden" id="loading-section">
+    <div class="loading-dots"><span></span><span></span><span></span></div>
+    <p>Analyzing your profile...</p>
+  </section>
+
+  <!-- RESULT -->
+  <section class="card hidden" id="result-section">
+    <div class="result-top">
+      <span class="result-label">Salary Report</span>
+      <span class="seniority-badge" id="seniority-badge">Mid Level</span>
+    </div>
+    <div class="verdict" id="verdict-label">You're underpaid</div>
+    <div class="gap-amount" id="gap-amount">$0</div>
+    <div class="gap-label" id="gap-label">below market per year</div>
+
+    <div class="stat-row">
+      <div class="stat-box">
+        <div class="k">Your Salary</div>
+        <div class="v" id="your-salary">$0</div>
+      </div>
+      <div class="stat-box">
+        <div class="k">Market Range</div>
+        <div class="v" id="market-range">$0–$0</div>
+        <div class="sub">Median <span id="market-median">$0</span></div>
+      </div>
+    </div>
+
+    <div class="sources" id="data-sources">Based on Glassdoor · LinkedIn Salary · BLS OES</div>
+    <div class="skills-row" id="skills-row"></div>
+    <p class="summary" id="summary-text"></p>
+
+    <div class="divider"></div>
+
+    <div class="share-label">Share your result</div>
+    <div class="share-row">
+      <button class="share-btn" onclick="shareX()">Share on X</button>
+      <button class="share-btn" onclick="shareLinkedIn()">LinkedIn</button>
+      <button class="share-btn" id="copy-btn" onclick="copyText()">Copy text</button>
+    </div>
+
+    <button class="check-another" onclick="reset()">← Check another salary</button>
+  </section>
+
+  <footer>
+    Built with real <a href="https://www.bls.gov/oes/" target="_blank" rel="noopener">BLS OES</a> data.
+    Estimates only — not financial advice.
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- PDF.js from CDN (client-side parsing, no server cost) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    // App URL resolves automatically to the current deployment — no manual edit needed.
+    const APP_URL = window.location.origin;
+
+    let resumeText = '';
+    let currentResult = null;
+
+    // ── PDF.js setup ──
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    const dropzone = document.getElementById('dropzone');
+    const dropzoneText = document.getElementById('dropzone-text');
+    document.getElementById('resume-file').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.type !== 'application/pdf') {
+        showError('Please upload a PDF file.');
+        return;
+      }
+      dropzoneText.textContent = 'Reading ' + file.name + '...';
+      try {
+        resumeText = await extractPdfText(file);
+        dropzone.classList.add('has-file');
+        dropzoneText.textContent = '✓ ' + file.name;
+      } catch (err) {
+        // Don't block the user if parsing fails.
+        resumeText = '';
+        dropzone.classList.remove('has-file');
+        dropzoneText.textContent = 'Could not read PDF — continuing without it';
+      }
+    });
+
+    async function extractPdfText(file) {
+      if (!window.pdfjsLib) return '';
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      const maxPages = Math.min(pdf.numPages, 5);
+      let text = '';
+      for (let i = 1; i <= maxPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map((it) => it.str).join(' ') + '\n';
+        if (text.length > 3000) break;
+      }
+      return text.slice(0, 3000);
+    }
+
+    // ── Section switching ──
+    function showSection(name) {
+      document.getElementById('form-section').classList.toggle('hidden', name !== 'form');
+      document.getElementById('loading-section').classList.toggle('hidden', name !== 'loading');
+      document.getElementById('result-section').classList.toggle('hidden', name !== 'result');
+    }
+
+    function showError(msg) {
+      document.getElementById('error-msg').textContent = msg || '';
+    }
+
+    function toast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2400);
+    }
+
+    // ── Main API call ──
+    async function analyze() {
+      showError('');
+      const payload = {
+        title: document.getElementById('title').value.trim(),
+        salary: Number(document.getElementById('salary').value),
+        experience: Number(document.getElementById('experience').value),
+        city: document.getElementById('city').value.trim(),
+        industry: document.getElementById('industry').value.trim(),
+        companySize: document.getElementById('company-size').value,
+        resumeText: resumeText || '',
+      };
+
+      if (!payload.title || !payload.salary || !payload.city) {
+        showError('Please fill in job title, salary, and city.');
+        return;
+      }
+
+      showSection('loading');
+      try {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || ('Error ' + res.status));
+        }
+        const data = await res.json();
+        currentResult = data;
+        renderResult(data, payload);
+        showSection('result');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        showSection('form');
+        showError('Something went wrong: ' + err.message);
+      }
+    }
+
+    function renderResult(data, form) {
+      const verdict = data.verdict || 'underpaid';
+      const gap = Math.abs(data.gap || 0);
+      const fmt = (n) => '$' + Math.round(Number(n) || 0).toLocaleString();
+      const fmtK = (n) => '$' + Math.round((Number(n) || 0) / 1000) + 'K';
+
+      const verdictLabels = {
+        underpaid: "You're underpaid",
+        fairly_paid: 'Fairly paid',
+        overpaid: 'Above market',
+      };
+      const gapLabels = {
+        underpaid: 'below market per year',
+        overpaid: 'above market per year',
+        fairly_paid: 'Your salary is on target',
+      };
+
+      const verdictEl = document.getElementById('verdict-label');
+      verdictEl.textContent = verdictLabels[verdict] || verdictLabels.underpaid;
+      verdictEl.className = 'verdict ' + verdict;
+
+      const gapEl = document.getElementById('gap-amount');
+      gapEl.textContent = verdict === 'fairly_paid' ? 'On Target' : fmt(gap);
+      gapEl.className = 'gap-amount ' + verdict;
+
+      document.getElementById('gap-label').textContent = gapLabels[verdict] || '';
+      document.getElementById('seniority-badge').textContent = (data.seniorityLevel || 'Mid') + ' Level';
+      document.getElementById('your-salary').textContent = fmt(form.salary);
+      document.getElementById('market-range').textContent =
+        fmtK(data.marketRateMin) + '–' + fmtK(data.marketRateMax);
+      document.getElementById('market-median').textContent = fmt(data.marketMedian);
+      document.getElementById('summary-text').textContent = data.summary || '';
+      document.getElementById('skills-row').innerHTML = (data.skills || [])
+        .map((s) => '<span class="skill-pill"></span>')
+        .join('');
+      // Set skill text via textContent to avoid any HTML injection from the model.
+      const pills = document.querySelectorAll('#skills-row .skill-pill');
+      (data.skills || []).forEach((s, i) => { if (pills[i]) pills[i].textContent = s; });
+
+      document.getElementById('data-sources').textContent =
+        'Based on ' + (data.dataSources || ['Glassdoor', 'LinkedIn Salary', 'BLS OES']).join(' · ');
+    }
+
+    function reset() {
+      showSection('form');
+      showError('');
+    }
+
+    // ── Sharing ──
+    function shareX() {
+      if (!currentResult) return;
+      const text = encodeURIComponent((currentResult.catchyLine || 'I just checked if I am underpaid') + ' →');
+      const url = encodeURIComponent(APP_URL);
+      window.open('https://x.com/intent/tweet?text=' + text + '&url=' + url, '_blank', 'noopener');
+    }
+
+    function shareLinkedIn() {
+      if (!currentResult) return;
+      const shareText = (currentResult.catchyLine || '') + '\n\n' + APP_URL;
+      const open = () =>
+        window.open(
+          'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(APP_URL),
+          '_blank', 'noopener'
+        );
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareText).then(() => {
+          toast('Text copied — paste into your LinkedIn post');
+          open();
+        }).catch(open);
+      } else {
+        open();
+      }
+    }
+
+    function copyText() {
+      if (!currentResult) return;
+      const text = (currentResult.catchyLine || '') + '\n\n' + APP_URL;
+      const btn = document.getElementById('copy-btn');
+      const done = () => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+      };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(done).catch(() => toast('Copy failed'));
+      } else {
+        toast('Copy not supported');
+      }
+    }
+
+    // Submit on Enter from any text field.
+    document.querySelectorAll('#form-section input').forEach((el) => {
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter') analyze(); });
+    });
+  </script>
+</body>
+</html>

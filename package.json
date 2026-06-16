@@ -1,0 +1,7 @@
+{
+  "name": "am-i-underpaid",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Find out if you're being paid what you're worth. Real BLS data + cheap AI.",
+  "engines": { "node": "18.x" }
+}
