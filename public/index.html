@@ -104,6 +104,15 @@
   button.primary:hover { opacity: 0.88; }
   button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  .field-note { font-size: 12px; color: var(--text-muted); margin-top: 5px; }
+
+  .consent {
+    display: flex; gap: 10px; align-items: flex-start;
+    margin-top: 14px; cursor: pointer; user-select: none;
+  }
+  .consent input { width: 18px; height: 18px; margin-top: 1px; flex-shrink: 0; accent-color: var(--fairly-paid); cursor: pointer; }
+  .consent span { font-size: 12.5px; color: var(--text-secondary); line-height: 1.45; }
+
   .error-msg { color: var(--underpaid); font-size: 13px; margin-top: 12px; min-height: 16px; }
 
   /* Loading */
@@ -243,6 +252,12 @@
     </div>
 
     <div class="field">
+      <label for="email">Email</label>
+      <input id="email" type="email" placeholder="you@email.com" autocomplete="email" />
+      <div class="field-note">Private — never shown on your shared card. Used only to send you job opportunities if you opt in below.</div>
+    </div>
+
+    <div class="field">
       <label>Resume PDF (optional — improves accuracy)</label>
       <label class="dropzone" id="dropzone">
         <span id="dropzone-text">Click to upload your resume PDF</span>
@@ -251,6 +266,12 @@
     </div>
 
     <button class="primary" id="analyze-btn" onclick="analyze()">Analyze my salary</button>
+
+    <label class="consent">
+      <input type="checkbox" id="consent" />
+      <span>Save my details so you can send me relevant job openings, salary updates, and opportunities. I can opt out anytime. My email is never shown on shared cards.</span>
+    </label>
+
     <div class="error-msg" id="error-msg"></div>
   </section>
 
@@ -312,7 +333,11 @@
     const APP_URL = window.location.origin;
 
     let resumeText = '';
+    let resumeFileName = '';
+    let resumeFileData = ''; // base64 (no data: prefix) for Drive upload, capped by size
     let currentResult = null;
+    let currentShareUrl = APP_URL;
+    const MAX_RESUME_BYTES = 4 * 1024 * 1024; // 4MB upload cap
 
     // ── PDF.js setup ──
     if (window.pdfjsLib) {
@@ -330,17 +355,31 @@
         return;
       }
       dropzoneText.textContent = 'Reading ' + file.name + '...';
+      resumeFileName = file.name;
+      // Capture raw bytes (base64) for optional Drive storage, within the size cap.
+      try {
+        resumeFileData = file.size <= MAX_RESUME_BYTES ? await fileToBase64(file) : '';
+      } catch { resumeFileData = ''; }
       try {
         resumeText = await extractPdfText(file);
         dropzone.classList.add('has-file');
         dropzoneText.textContent = '✓ ' + file.name;
       } catch (err) {
-        // Don't block the user if parsing fails.
+        // Don't block the user if parsing fails — we can still upload the file.
         resumeText = '';
-        dropzone.classList.remove('has-file');
-        dropzoneText.textContent = 'Could not read PDF — continuing without it';
+        dropzone.classList.add('has-file');
+        dropzoneText.textContent = '✓ ' + file.name;
       }
     });
+
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
 
     async function extractPdfText(file) {
       if (!window.pdfjsLib) return '';
@@ -385,11 +424,20 @@
         city: document.getElementById('city').value.trim(),
         industry: document.getElementById('industry').value.trim(),
         companySize: document.getElementById('company-size').value,
+        email: document.getElementById('email').value.trim(),
+        consent: document.getElementById('consent').checked,
         resumeText: resumeText || '',
+        resumeFileName: resumeFileName || '',
+        // Only send the raw file for storage when the user has consented.
+        resumeFileData: document.getElementById('consent').checked ? (resumeFileData || '') : '',
       };
 
       if (!payload.title || !payload.salary || !payload.city) {
         showError('Please fill in job title, salary, and city.');
+        return;
+      }
+      if (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+        showError('Please enter a valid email, or leave it blank.');
         return;
       }
 
@@ -406,6 +454,7 @@
         }
         const data = await res.json();
         currentResult = data;
+        currentShareUrl = buildShareUrl(data, payload); // per-result link (no email)
         renderResult(data, payload);
         showSection('result');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -463,20 +512,37 @@
       showError('');
     }
 
+    // Encode the result (NEVER the email) into a per-person share link.
+    // The /s page reads this and renders a unique OG card for this result.
+    function buildShareUrl(data, form) {
+      try {
+        const payload = {
+          t: form.title, c: form.city, v: data.verdict, g: data.gap,
+          s: form.salary, lo: data.marketRateMin, hi: data.marketRateMax,
+          md: data.marketMedian, sl: data.seniorityLevel,
+        };
+        const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
+          .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        return APP_URL + '/s?d=' + b64;
+      } catch {
+        return APP_URL;
+      }
+    }
+
     // ── Sharing ──
     function shareX() {
       if (!currentResult) return;
       const text = encodeURIComponent((currentResult.catchyLine || 'I just checked if I am underpaid') + ' →');
-      const url = encodeURIComponent(APP_URL);
+      const url = encodeURIComponent(currentShareUrl);
       window.open('https://x.com/intent/tweet?text=' + text + '&url=' + url, '_blank', 'noopener');
     }
 
     function shareLinkedIn() {
       if (!currentResult) return;
-      const shareText = (currentResult.catchyLine || '') + '\n\n' + APP_URL;
+      const shareText = (currentResult.catchyLine || '') + '\n\n' + currentShareUrl;
       const open = () =>
         window.open(
-          'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(APP_URL),
+          'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(currentShareUrl),
           '_blank', 'noopener'
         );
       if (navigator.clipboard) {
@@ -491,7 +557,7 @@
 
     function copyText() {
       if (!currentResult) return;
-      const text = (currentResult.catchyLine || '') + '\n\n' + APP_URL;
+      const text = (currentResult.catchyLine || '') + '\n\n' + currentShareUrl;
       const btn = document.getElementById('copy-btn');
       const done = () => {
         const orig = btn.textContent;

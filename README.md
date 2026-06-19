@@ -21,14 +21,16 @@ variables (`AI_PROVIDER=deepseek` and your `DEEPSEEK_API_KEY`). That's the whole
 
 ```
 public/index.html      Full landing page + app (all CSS/JS inline)
-api/analyze.js         Serverless function: validation, BLS fetch, AI call, persistence
+api/analyze.js         Serverless function: validation, BLS fetch, AI call, capture
+api/og.js              Dynamic per-result OG card image (PNG via @vercel/og)
+api/share.js           Per-result share page (/s) with unique OG meta tags
 lib/soc-codes.js       Job title → BLS SOC code lookup
 lib/bls.js             BLS OES API helper
 lib/ai.js              AI provider abstraction (DeepSeek / Qwen / Groq)
 lib/rate-limit.js      In-memory rate limiter (cost-abuse protection)
-lib/supabase.js        Optional secure analytics persistence
-supabase/schema.sql    Table + Row Level Security policy
-vercel.json            Function config + security headers
+lib/sheets.js          Optional Google Sheets + Drive capture (consent-gated)
+apps-script/Code.gs    Google Apps Script to paste into your Sheet
+vercel.json            Routes, function config + security headers
 ```
 
 ---
@@ -82,37 +84,47 @@ Override the model for any provider with `AI_MODEL` (e.g. `qwen-turbo`, `deepsee
 
 This app is built so **no one can access your tokens** and user data is handled safely:
 
-- **Keys never reach the browser.** All AI / Supabase keys are read from server-side
-  environment variables inside the serverless function only. Nothing secret is in
+- **Keys never reach the browser.** All AI keys and the Sheets webhook URL are read from
+  server-side environment variables inside the serverless function only. Nothing secret is in
   `public/index.html`.
 - **`.env` is git-ignored.** Only `.env.example` (placeholders) is committed.
-- **Input validation & size caps** on every field; resume text is hard-capped and only used
-  transiently for the prompt.
+- **Input validation & size caps** on every field; resume text is hard-capped and the resume
+  file upload is size-limited.
 - **Rate limiting** per IP guards the AI key against cost-abuse.
 - **Origin enforcement** — the API only answers same-origin requests (plus any origins you
   explicitly allow via `ALLOWED_ORIGINS`).
-- **Security headers** (CSP, `X-Frame-Options`, HSTS, `nosniff`, etc.) via `vercel.json`.
-- **No HTML injection** — model output is rendered with `textContent`, never `innerHTML`.
-- **Resume never stored.** PDF parsing happens entirely in the browser; resume text is sent
-  only for the analysis and is never written to any database.
+- **Security headers** (CSP, HSTS, `nosniff`, frame-ancestors none, etc.) via `vercel.json`.
+- **No HTML injection** — model output is rendered with `textContent`; the share page
+  HTML-escapes all injected values.
+- **Email is private.** It is never placed in the share URL, the OG card, or the share page —
+  only stored (with consent) for sending opportunities.
+- **Consent-gated capture.** Data and resumes are saved *only* when the user ticks the box.
 
-### Optional secure data storage (Supabase)
+### Per-result social share card
 
-Persistence is **off** unless you configure it. To store anonymous analytics:
+Each analysis produces a unique share link `…/s?d=<encoded result>`:
 
-1. Create a free project at [supabase.com](https://supabase.com).
-2. Run [`supabase/schema.sql`](supabase/schema.sql) in the SQL editor. It creates the
-   `analyses` table with **Row Level Security enabled and no public policies**.
-3. Add `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` (the **service role** key) to your Vercel
-   environment variables.
+- `api/share.js` serves that URL with per-result Open Graph tags so X/LinkedIn unfurl the
+  right card, and shows a human-friendly card + CTA.
+- `api/og.js` renders the card as a 1200×630 PNG on the fly (via `@vercel/og`).
+- The encoded payload contains only role/city/salary/range/verdict — **never the email.**
+
+### Optional data storage — Google Sheets + Drive
+
+Capture is **off** unless you configure it, and only fires with user consent.
+
+1. Create a Google Sheet → **Extensions → Apps Script**.
+2. Paste [`apps-script/Code.gs`](apps-script/Code.gs); set `SECRET_TOKEN` (and optionally a
+   `DRIVE_FOLDER_ID` to store resume PDFs).
+3. **Deploy → New deployment → Web app** (Execute as *Me*, Access *Anyone*). Copy the URL.
+4. In Vercel, set `SHEETS_WEBHOOK_URL` (the Web app URL) and `SHEETS_WEBHOOK_TOKEN` (the same
+   `SECRET_TOKEN`).
 
 How it stays secure:
 
-- Writes happen **server-side only** using the service role key, which bypasses RLS.
-- The browser never talks to Supabase and never sees the key.
-- Because RLS is on with no anon/authenticated policies, even a leaked anon key can't read or
-  write the table.
-- Only coarse, non-identifying fields are stored — **no resume text, name, email, or files.**
+- The site posts to the webhook **server-side only** — the browser never sees the URL.
+- The shared `SHEETS_WEBHOOK_TOKEN` is checked by the script, so guessing the URL isn't enough.
+- The script runs as you, so no Google Cloud service account or key files are needed.
 
 ---
 
@@ -120,6 +132,7 @@ How it stays secure:
 
 - Add SOC mappings in `lib/soc-codes.js`.
 - Tune the rate limit window in `lib/rate-limit.js`.
-- Adjust the stored columns in `lib/supabase.js` + `supabase/schema.sql`.
+- Adjust stored columns in `lib/sheets.js` + `apps-script/Code.gs`.
+- Restyle the share card in `api/og.js`.
 
 > Estimates are AI-assisted and for informational purposes only — not financial advice.

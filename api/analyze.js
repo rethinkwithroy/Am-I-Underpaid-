@@ -1,8 +1,10 @@
 const { getSocCode } = require('../lib/soc-codes');
 const { fetchBLSSalary } = require('../lib/bls');
 const { callAI } = require('../lib/ai');
-const { saveAnalysis } = require('../lib/supabase');
+const { saveLead } = require('../lib/sheets');
 const { checkRateLimit } = require('../lib/rate-limit');
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ── Security: decide which origins may call this endpoint ──
 // Same-origin requests (the deployed page calling its own /api) are always allowed.
@@ -38,6 +40,15 @@ function validateInput(body) {
   if (!city || city.length > 120) errors.push('city');
   if (!Number.isFinite(salary) || salary <= 0 || salary > 100_000_000) errors.push('salary');
 
+  const email = typeof body.email === 'string' ? body.email.trim().slice(0, 200) : '';
+  if (email && !EMAIL_RE.test(email)) errors.push('email');
+
+  // Resume file is only accepted for storage, capped to ~5MB of base64.
+  const resumeFileData =
+    typeof body.resumeFileData === 'string' && body.resumeFileData.length <= 7_000_000
+      ? body.resumeFileData
+      : '';
+
   return {
     errors,
     clean: {
@@ -47,8 +58,12 @@ function validateInput(body) {
       experience: Number.isFinite(experience) && experience >= 0 ? Math.min(experience, 80) : 0,
       industry: typeof body.industry === 'string' ? body.industry.trim().slice(0, 120) : '',
       companySize: typeof body.companySize === 'string' ? body.companySize.trim().slice(0, 40) : '',
+      email,
+      consent: body.consent === true,
       // Hard cap resume text; it is used transiently for the prompt and never stored.
       resumeText: typeof body.resumeText === 'string' ? body.resumeText.slice(0, 3000) : '',
+      resumeFileName: typeof body.resumeFileName === 'string' ? body.resumeFileName.slice(0, 200) : '',
+      resumeFileData,
     },
   };
 }
@@ -144,12 +159,14 @@ Using the BLS reference data above AND your knowledge of Glassdoor, LinkedIn Sal
 
   result.blsMedian = blsData?.median || null;
 
-  // ── Optional secure persistence (never blocks the response) ──
-  saveAnalysis({
-    input: clean,
-    result,
-    meta: { socLabel, providerLabel },
-  }).catch(() => {});
+  // ── Optional lead/data capture — ONLY with explicit consent. Never blocks the response. ──
+  if (clean.consent) {
+    saveLead({
+      input: clean,
+      result,
+      meta: { socLabel, providerLabel },
+    }).catch(() => {});
+  }
 
   res.setHeader('Cache-Control', 'no-store');
   return res.status(200).json(result);
