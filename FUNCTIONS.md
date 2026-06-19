@@ -20,6 +20,11 @@ Legend: ✅ done · 🟡 built, not yet verified end-to-end with real keys · �
 - 🟡 Share on X — built, not clicked live
 - 🟡 Share on LinkedIn (copy + open) — built, not clicked live
 - 🟡 Copy text button — built, not clicked live
+- ⬜ **Dynamic OG share image** — design mocked (`.preview/og-card.png`), NOT wired up.
+      Today only the catchy text line + a static link card are shared. To make the
+      personalized result render as an image in the social unfurl we need:
+      (a) an `/api/og` image-generation endpoint, and
+      (b) per-result OG tags (encode result in the share URL).
 
 ## Backend / API (`/api/analyze`)
 - 🟡 Request validation + error responses — unit-tested with mocks ✅, not run on Vercel

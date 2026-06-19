@@ -8,6 +8,13 @@ resume PDF) and get an AI-generated salary report card in ~10 seconds, grounded 
 - **No database required** — fully stateless by default (Supabase persistence is optional).
 - **Cheap AI** — defaults to DeepSeek; Qwen and Groq are drop-in alternates.
 
+## Deploy in one click
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Frethinkwithroy%2FAm-I-Underpaid-&env=AI_PROVIDER,DEEPSEEK_API_KEY&envDescription=Set%20AI_PROVIDER%20to%20deepseek%20and%20paste%20your%20DeepSeek%20API%20key&envLink=https%3A%2F%2Fplatform.deepseek.com)
+
+Clicking the button imports this repo into Vercel and prompts you for two environment
+variables (`AI_PROVIDER=deepseek` and your `DEEPSEEK_API_KEY`). That's the whole deploy.
+
 ---
 
 ## Architecture
