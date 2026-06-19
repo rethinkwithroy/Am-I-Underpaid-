@@ -10,6 +10,9 @@ node_modules/
 # Vercel
 .vercel
 
+# Local preview screenshots
+.preview/
+
 # OS / editor
 .DS_Store
 *.log
