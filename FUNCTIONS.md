@@ -34,7 +34,13 @@ Legend: ✅ done · 🟡 built, not yet verified end-to-end with real keys · �
 ## Backend / API (`/api/analyze`)
 - 🟡 Request validation + error responses — unit-tested with mocks ✅, not run on Vercel
 - 🟡 SOC code lookup (`lib/soc-codes.js`) — unit-tested ✅
-- 🟡 BLS OES salary fetch (`lib/bls.js`) — NOT tested against the real BLS API yet
+- ✅ BLS OEWS salary fetch (`lib/bls.js`) — VERIFIED against the live BLS API
+      (correct OEWS series ID, annual-median datatype 13, "latest" year). Real 2025
+      medians confirmed (e.g. Software Developers $135,980).
+- ✅ Global locations — prompt infers country from any city worldwide; BLS used only
+      as a US anchor; all figures returned in USD (per product decision). Verified with
+      a London test case. Note: non-US numbers come from model knowledge (no free global
+      salary API exists — Glassdoor/Levels/LinkedIn have no public API).
 - 🟡 AI call (`lib/ai.js`, DeepSeek default) — mock-tested ✅, NOT called with a real key yet
 - 🟡 End-to-end analyze flow — mock-tested ✅, not run live
 

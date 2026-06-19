@@ -109,19 +109,24 @@ module.exports = async function handler(req, res) {
   const { code: socCode, label: socLabel } = getSocCode(clean.title);
   const blsData = await fetchBLSSalary(socCode);
 
+  // BLS is US-only, so present it as a US national reference the model should use
+  // ONLY when the location is in the United States. Everywhere else it relies on
+  // its global knowledge and converts to USD.
   const blsContext = blsData
-    ? `Real BLS OES data for ${socLabel}: national median annual salary is $${blsData.median.toLocaleString()} (${blsData.year} data).`
-    : `No BLS data available. Use your training knowledge of Glassdoor, LinkedIn Salary, and Levels.fyi for this role.`;
+    ? `US BLS OEWS reference for ${socLabel} (use ONLY if the location is in the United States): US national median annual wage is $${blsData.median.toLocaleString()} (${blsData.year}).`
+    : `No BLS reference available; use your training knowledge for this role and location.`;
 
   const systemPrompt =
-    'You are a senior compensation analyst with access to real salary data from ' +
-    'Glassdoor, LinkedIn Salary Insights, Levels.fyi, and the Bureau of Labor Statistics. ' +
-    'Your estimates are accurate and specific to the role, location, and experience level provided. ' +
+    'You are a senior compensation analyst with global salary knowledge from sources like ' +
+    'Glassdoor, LinkedIn Salary, Levels.fyi, Payscale, and government statistics worldwide. ' +
+    'You handle ANY country or city, not just the United States. Always express every monetary ' +
+    'figure in US dollars (USD): if the local market pays in another currency, convert the ' +
+    'local-market rate to its USD equivalent. The user\'s entered salary is already in USD. ' +
     'Return ONLY valid JSON with no markdown formatting.';
 
   const userPrompt = `Analyze this person's compensation:
 Job title: ${clean.title}
-Current annual salary: $${clean.salary.toLocaleString()}
+Current annual salary: $${clean.salary.toLocaleString()} (USD)
 Years of experience: ${clean.experience}
 City/Location: ${clean.city}
 Industry: ${clean.industry || 'Technology'}
@@ -129,19 +134,22 @@ Company size: ${clean.companySize || 'Medium'}
 ${blsContext}
 ${clean.resumeText ? `\nResume text (use for skills/seniority):\n${clean.resumeText}` : ''}
 
-Using the BLS reference data above AND your knowledge of Glassdoor, LinkedIn Salary, and Levels.fyi for ${clean.city}, return this exact JSON:
+First infer which country "${clean.city}" is in, then estimate the local market pay for this
+role there and convert it to USD. Use the US BLS reference above only if the location is in the
+United States. Return this exact JSON (ALL money fields are integers in USD):
 {
-  "marketRateMin": <integer, 10th percentile annual USD for this role in ${clean.city}>,
-  "marketRateMax": <integer, 90th percentile annual USD for this role in ${clean.city}>,
-  "marketMedian": <integer, 50th percentile annual USD>,
-  "gap": <integer, marketMedian minus ${clean.salary}, positive means underpaid>,
+  "country": "<the country you inferred for ${clean.city}>",
+  "marketRateMin": <10th percentile annual pay for this role in ${clean.city}, in USD>,
+  "marketRateMax": <90th percentile annual pay for this role in ${clean.city}, in USD>,
+  "marketMedian": <50th percentile annual pay, in USD>,
+  "gap": <marketMedian minus ${clean.salary}, positive means underpaid>,
   "verdict": <"underpaid" | "fairly_paid" | "overpaid">,
-  "percentGap": <integer, absolute percent difference from median>,
+  "percentGap": <absolute percent difference from median>,
   "seniorityLevel": <"Junior" | "Mid" | "Senior" | "Staff" | "Principal">,
   "skills": [<4 to 6 skills inferred from title and resume>],
-  "summary": "<2 sentences: specific insight about their situation and what's driving the gap>",
-  "catchyLine": "<punchy first-person social share line, max 15 words, include the dollar gap amount>",
-  "dataSources": ["Glassdoor", "LinkedIn Salary", "BLS OES"]
+  "summary": "<2 sentences: specific insight about their situation and what's driving the gap; mention the city/country>",
+  "catchyLine": "<punchy first-person social share line, max 15 words, include the USD gap amount>",
+  "dataSources": [<2-4 sources you relied on, e.g. "Glassdoor", "LinkedIn Salary", "BLS OEWS", "Payscale">]
 }`;
 
   let result;
