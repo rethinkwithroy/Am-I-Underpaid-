@@ -63,12 +63,13 @@ Set two env vars — that's it:
 
 | Provider | `AI_PROVIDER` | Default model            | Notes                                  |
 |----------|---------------|--------------------------|----------------------------------------|
-| DeepSeek | `deepseek`    | `deepseek-chat`          | Cheap, strong. **Default.**            |
+| DeepSeek | `deepseek`    | `deepseek-v4-flash`      | Cheap, strong. **Default.**            |
 | Qwen     | `qwen`        | `qwen-plus`              | Alibaba DashScope, OpenAI-compatible.  |
 | Groq     | `groq`        | `llama-3.1-8b-instant`   | Fast free tier (14,400 req/day).       |
 
 Override the model for any provider with `AI_MODEL` (e.g. `qwen-turbo`, `deepseek-chat`,
-`llama-3.3-70b-versatile`).
+`llama-3.3-70b-versatile`). DeepSeek's legacy `deepseek-chat` alias is deprecated after
+2026-07-24, so the default is pinned to `deepseek-v4-flash`.
 
 ---
 
