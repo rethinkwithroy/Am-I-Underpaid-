@@ -65,16 +65,27 @@ Legend: ✅ done · 🟡 built, not yet verified end-to-end with real keys · �
 
 ## Deployment
 - ⬜ Live Vercel deployment + public URL
-- ⬜ Env vars set in Vercel (AI key, AI_PROVIDER, optional Supabase)
+- ⬜ Env vars set in Vercel (AI key, AI_PROVIDER, Sheets webhook)
 - ⬜ Verify security headers live
 - ⬜ Verify real BLS + AI round-trip on production
+
+## Global salary data roadmap (decision: ship now, anchor later)
+Non-US currently uses model knowledge in USD. Add real free government wage
+anchors (like BLS) by priority market:
+- ✅ US — BLS OEWS (live)
+- ⬜ UK — ONS ASHE
+- ⬜ Canada — Statistics Canada
+- ⬜ Australia — ABS
+- ⬜ Europe — Eurostat
+- ⬜ India — no reliable free official API; model knowledge stays the source
 
 ---
 
 ## Suggested order to tackle next
 1. Deploy to Vercel to get a live URL (so we can click through the real flow).
 2. Add a DeepSeek key → verify the end-to-end analyze round-trip.
-3. Verify BLS returns real numbers for a few job titles.
+3. Confirm BLS + global (USD) results look right for a few roles/cities.
 4. Test PDF resume upload with a real resume.
-5. Test the three share buttons.
-6. (Optional) Wire up Supabase and confirm a row is written.
+5. Test the three share buttons + the per-result OG card unfurl.
+6. Confirm a row + resume link land in the Google Sheet.
+7. (Fast-follow) Add UK/Canada/Australia government anchors.
